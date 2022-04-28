@@ -187,6 +187,14 @@ std::shared_ptr<ngraph::Node> DepthwiseConv2d::createNode() {
     inputNode = getInputNode(0);
     filterNode = getInputNode(1);
     biasNode = getInputNode(2);
+    // OpenVino expects filter in OIHW format
+    filterNode = transpose(IHWO_OIHW, filterNode);
+    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+    const auto inputOp = sModelInfo->getOperand(inputIndex);
+    if (!useNchw && inputOp.lifetime ==
+                        OperandLifeTime::SUBGRAPH_INPUT) {  // No conversion needed if useNchw set
+        inputNode = transpose(NHWC_NCHW, inputNode);
+    }
 
     if (checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
         auto filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
@@ -205,17 +213,22 @@ std::shared_ptr<ngraph::Node> DepthwiseConv2d::createNode() {
             std::make_shared<ngraph::opset3::Multiply>(filterScalesNode, inputScalesNode);
         biasNode = std::make_shared<ngraph::opset3::Convert>(biasNode, ngraph::element::f32);
         biasNode = std::make_shared<ngraph::opset3::Multiply>(biasNode, biasScalMultiplier);
+        filterNode = DequantizeNode(filterNode, filterIndex, ngraph::element::f32);
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
                checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
         // for quant type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32 type,
         // dequantization is not applied during node creation
         biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);
+        auto filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+        filterNode = DequantizeNode(filterNode, filterIndex, ngraph::element::f32);
     }
 
-    // OpenVino expects filter in OIHW format
-    filterNode = transpose(IHWO_OIHW, filterNode);
-    if (!useNchw) {  // No conversion needed if useNchw set
-        inputNode = transpose(NHWC_NCHW, inputNode);
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+        checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED) ||
+        checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_SYMM) ||
+        checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
+        // inputNode = std::make_shared<ngraph::opset3::Convert>(inputNode, ngraph::element::f32);
+        inputNode = addFakeQuantizeNode(inputNode, 0, 256);
     }
 
     strides = {(size_t)stride_height, (size_t)stride_width};
@@ -227,7 +240,6 @@ std::shared_ptr<ngraph::Node> DepthwiseConv2d::createNode() {
         std::vector<size_t> shape(&filterNode->get_shape()[0], &filterNode->get_shape()[0] + 4);
         shape[0] /= input_channel;
         shape.insert(shape.begin(), input_channel);
-        ALOGD("%s final filternode shape %lu", __func__, shape.size());
 
         auto shapeNode = createConstNode(ngraph::element::i32, ngraph::Shape{shape.size()}, shape);
 
@@ -248,8 +260,17 @@ std::shared_ptr<ngraph::Node> DepthwiseConv2d::createNode() {
     std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::Add>(
         groupConvNode, biasNode, ngraph::op::AutoBroadcastType::NUMPY);
     outputNode = applyActivation(outputNode, activationFn);
-
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto op = sModelInfo->getOperand(outputIndex);
+    if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+        if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+            checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_SYMM)) {
+            outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
+        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
+            outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::i8);
+        }
+    }
+    if (!useNchw && op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
 

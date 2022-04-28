@@ -26,6 +26,13 @@ bool Conv2d::validate() {
         return false;
     }
 
+    const auto& inputDimensions0 = getInputOperandDimensions(0);
+    ALOGV("Input operand 0 dimensions : %d %d %d %d\n", inputDimensions0[0], inputDimensions0[1],
+          inputDimensions0[2], inputDimensions0[3]);
+    const auto& inputDimensions1 = getInputOperandDimensions(1);
+    ALOGV("Input operand 1 dimensions : %d %d %d %d\n", inputDimensions1[0], inputDimensions1[1],
+          inputDimensions1[2], inputDimensions1[3]);
+
     if (checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
         const auto& operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
         const auto& operand = sModelInfo->getOperand(operandIndex);
@@ -178,6 +185,15 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
     inputNode = getInputNode(0);
     filterNode = getInputNode(1);
     biasNode = getInputNode(2);
+    // OpenVino expects filter in OIHW format
+    filterNode = transpose(OHWI_OIHW, filterNode);
+    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+    const auto inputOp = sModelInfo->getOperand(inputIndex);
+    if (!useNchw && inputOp.lifetime ==
+                        OperandLifeTime::SUBGRAPH_INPUT) {  // No conversion needed if useNchw set
+        inputNode = transpose(NHWC_NCHW, inputNode);
+        const auto& inputdimensions = getInputOperandDimensions(0);
+    }
 
     if (checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
         auto filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
@@ -196,17 +212,20 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
             std::make_shared<ngraph::opset3::Multiply>(filterScalesNode, inputScalesNode);
         biasNode = std::make_shared<ngraph::opset3::Convert>(biasNode, ngraph::element::f32);
         biasNode = std::make_shared<ngraph::opset3::Multiply>(biasNode, biasScalMultiplier);
+        filterNode = DequantizeNode(filterNode, filterIndex, ngraph::element::f32);
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
                checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
         // for quant type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32 type,
         // dequantization is not applied during node creation
         biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);
+        auto filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+        filterNode = DequantizeNode(filterNode, filterIndex, ngraph::element::f32);
     }
-
-    // OpenVino expects filter in OIHW format
-    filterNode = transpose(OHWI_OIHW, filterNode);
-    if (!useNchw) {  // No conversion needed if useNchw set
-        inputNode = transpose(NHWC_NCHW, inputNode);
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+        checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED) ||
+        checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_SYMM) ||
+        checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
+        inputNode = addFakeQuantizeNode(inputNode, 0, 256);
     }
 
     strides = {(size_t)stride_height, (size_t)stride_width};
@@ -229,7 +248,19 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
         convNode, biasNode, ngraph::op::AutoBroadcastType::NUMPY);
     outputNode = applyActivation(outputNode, activationFn);
 
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto op = sModelInfo->getOperand(outputIndex);
+    const auto& dim = op.dimensions;
+    for (auto el : dim) ALOGV("%d:", el);
+    if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+        if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+            checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_SYMM)) {
+            outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
+        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
+            outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::i8);
+        }
+    }
+    if (!useNchw && op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
 

@@ -29,21 +29,23 @@ std::shared_ptr<ngraph::Node> Split::createNode() {
     for (size_t i = 0; i < numSplits; i++) {
         auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
         // TODO: remove this dummy convert
-        std::shared_ptr<ngraph::Node> outNode;
-        if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-            outNode =
-                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
-        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
-            outNode =
-                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f16);
-        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-            outNode =
-                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::i32);
-        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
-                   checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
-            outNode = std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::u8);
-        }
-
+        /*        std::shared_ptr<ngraph::Node> outNode;
+                if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+                    outNode =
+                        std::make_shared<ngraph::opset3::Convert>(outputNode[i],
+           ngraph::element::f32); } else if (checkInputOperandType(0,
+           (int32_t)OperandType::TENSOR_FLOAT16)) { outNode =
+                        std::make_shared<ngraph::opset3::Convert>(outputNode[i],
+           ngraph::element::f16); } else if (checkInputOperandType(0,
+           (int32_t)OperandType::TENSOR_INT32)) { outNode =
+                        std::make_shared<ngraph::opset3::Convert>(outputNode[i],
+           ngraph::element::i32); } else if (checkInputOperandType(0,
+           (int32_t)OperandType::TENSOR_QUANT8_ASYMM) || checkInputOperandType(0,
+           (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) { outNode =
+           std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::u8);
+                }
+        */
+        auto outNode = outputNode[i].get_node_shared_ptr();
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, outNode);
         const auto op = sModelInfo->getOperand(outputIndex);
         if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {

@@ -69,19 +69,19 @@ std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin() { return cre
 void OperationsBase::connectOperationToGraph() {
     auto outputNode = createNodeForPlugin();
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
-        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u8);
-    }
-    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
-        op.type == OperandType::TENSOR_QUANT8_SYMM) {
-        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i8);
-    }
-    if (op.type == OperandType::TENSOR_QUANT16_ASYMM) {
-        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u16);
-    }
-    if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
-        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i16);
-    }
+    /*    if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
+            outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u8);
+        }
+        if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
+            op.type == OperandType::TENSOR_QUANT8_SYMM) {
+            outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i8);
+        }
+        if (op.type == OperandType::TENSOR_QUANT16_ASYMM) {
+            outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u16);
+        }
+        if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+            outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i16);
+        }*/
     if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
     }
@@ -142,6 +142,70 @@ bool OperationsBase::isValidInputTensor(uint32_t inputIndex) {
 
     return true;
 }
+std::shared_ptr<ngraph::Node> OperationsBase::addFakeQuantizeNode(
+    std::shared_ptr<ngraph::Node> inputNode, uint32_t index, uint32_t levels) {
+    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, index);
+    const auto inputOp = sModelInfo->getOperand(inputIndex);
+    float input_low, input_high, output_low, output_high;
+
+    ALOGV("lifetime is %d", inputOp.lifetime);
+    if (inputOp.lifetime == OperandLifeTime::SUBGRAPH_INPUT) {
+        inputNode = std::make_shared<ngraph::opset3::Convert>(inputNode, ngraph::element::f32);
+        auto operandType = sModelInfo->getOperandType(inputIndex);
+        switch (operandType) {
+            case OperandType::TENSOR_QUANT8_ASYMM:
+            case OperandType::TENSOR_QUANT8_SYMM:
+                input_low = 0;
+                input_high = 255;
+                break;
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
+                input_low = -128;
+                input_high = 127;
+                break;
+            default:
+                input_low = 0;
+                input_high = 255;
+        }
+    } else {
+        const auto& prevOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex - 1, 0);
+        ALOGV("previous output index is %d\n", prevOutputIndex);
+        float scale, zeroPoint;
+        scale = sModelInfo->getOperandScale(prevOutputIndex);
+        zeroPoint = sModelInfo->getOperandZeroPoint(prevOutputIndex);
+        ALOGV("scale and zero point is %f %f\n", scale, zeroPoint);
+        if (zeroPoint == 0)
+            input_low = 0;
+        else
+            input_low = -scale * zeroPoint;
+        input_high = scale * (levels - 1 - zeroPoint);
+    }
+
+    auto scale = inputOp.scale;
+    auto zeroPoint = inputOp.zeroPoint;
+    if (zeroPoint == 0)
+        output_low = 0;
+    else
+        output_low = -scale * zeroPoint;
+    output_high = scale * (levels - 1 - zeroPoint);
+
+    ALOGV(" input low and high : %f %f output low and high: %f %f", input_low, input_high,
+          output_low, output_high);
+
+    auto inputLowNode =
+        createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(input_low));
+    auto inputHighNode =
+        createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(input_high));
+    auto outputLowNode =
+        createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(output_low));
+    auto outputHighNode =
+        createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(output_high));
+    auto levelsNode =
+        createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(levels));
+    auto fakeQuantizeNode = std::make_shared<ngraph::opset3::FakeQuantize>(
+        inputNode, inputLowNode, inputHighNode, outputLowNode, outputHighNode, levels);
+    inputNode = fakeQuantizeNode;
+    return inputNode;
+}
 
 std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngraph::Node> input,
                                                            size_t index,
@@ -154,6 +218,8 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
 
     auto scale = createConstNode(floatElementType, {}, convertToVector(inputScale));
     auto zeroPoint = createConstNode(intElementType, {}, convertToVector(inputZeroPoint));
+    ALOGV("scale of output node while quantizing is %f\n", inputScale);
+    ALOGV("zero point of output node while quantizing is %d\n", inputZeroPoint);
 
     if (input->get_element_type() != ngraph::element::f32)
         input = std::make_shared<ngraph::opset3::Convert>(input, floatElementType);
@@ -203,15 +269,20 @@ std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngr
         auto scaleNode = createConstNode(ngraph::element::f32, ngraph::Shape{shape}, inputScales);
         outputNode = std::make_shared<ngraph::opset3::Multiply>(input, scaleNode);
     } else {
+        ALOGV("scale and zp is &&&&&& %f, %d\n", sModelInfo->getOperandScale(index),
+              sModelInfo->getOperandZeroPoint(index));
         auto scaleNode = createConstNode(ngraph::element::f32, {},
                                          convertToVector(sModelInfo->getOperandScale(index)));
-        auto zeroPointNode = createConstNode(
-            ngraph::element::f32, {}, convertToVector(sModelInfo->getOperandZeroPoint(index)));
 
-        if (operand.type == OperandType::TENSOR_QUANT8_ASYMM ||
-            operand.type == OperandType::TENSOR_QUANT16_ASYMM ||
-            operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED)
+        if ((operand.type == OperandType::TENSOR_QUANT8_ASYMM ||
+             operand.type == OperandType::TENSOR_QUANT16_ASYMM ||
+             operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) &&
+            sModelInfo->getOperandZeroPoint(index) != 0.0f) {
+            auto zeroPointNode = createConstNode(
+                ngraph::element::f32, {}, convertToVector(sModelInfo->getOperandZeroPoint(index)));
+            ALOGV("zero point is %d\n", sModelInfo->getOperandZeroPoint(index));
             input = std::make_shared<ngraph::opset3::Subtract>(input, zeroPointNode);
+        }
 
         auto mul = std::make_shared<ngraph::opset3::Multiply>(input, scaleNode);
         outputNode = mul;

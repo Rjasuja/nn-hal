@@ -74,7 +74,7 @@ static Return<void> notify(const sp<V1_3::IExecutionCallback>& callback, const E
 static void floatToUint8(const float* src, uint8_t* dst, size_t size) {
     for (uint32_t i = 0; i < size; ++i) {
         dst[i] = static_cast<uint8_t>(src[i]);
-        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
+        //        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
     }
 }
 
@@ -348,7 +348,26 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             }
         } else {
             uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+            if (i == 0) {
+                ALOGV("came here 11111\n");
+                std::ifstream in;
+                in.open("/home/input_0.txt", std::ios::in | std::ios::binary);
+                uint8_t* src = (uint8_t*)srcPtr;
+                ALOGV("came here222222\n");
+                int j = 0;
+                char byte;
+                // while(in.get(byte)) {
+                for (size_t j = 0; j < len; j++) {
+                    in.get(byte);
+                    src[j] = (uint8_t)byte;
+                    //	    ALOGV("%d %d\n", src[j], j);
+                }
+                in.close();
+            }
+
             std::memcpy(dest, (uint8_t*)srcPtr, len);
+            /*	    for (int i =0; i <len ; i++)
+                            ALOGV("%d\n ", dest[i]);*/
         }
     }
 
@@ -434,6 +453,14 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             }
             case OperandType::TENSOR_QUANT8_ASYMM: {
                 floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                std::ofstream in;
+                in.open("/home/output_0.txt", std::ios::out | std::ios::binary);
+                uint8_t* dst = (uint8_t*)destPtr;
+                for (uint32_t i = 0; i < srcBlob->size(); i++)
+                    // ALOGE("%u\n", dst[i]);
+                    in << std::to_string(dst[i]) << "\n";
+                in.close();
+
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:

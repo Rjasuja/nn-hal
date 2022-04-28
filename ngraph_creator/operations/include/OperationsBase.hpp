@@ -124,17 +124,17 @@ protected:
             input = mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
         }
 
-        if (dequantize) {
-            if (operandType == OperandType::TENSOR_QUANT8_ASYMM ||
-                operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL ||
-                operandType == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
-                operandType == OperandType::TENSOR_QUANT8_SYMM ||
-                operandType == OperandType::TENSOR_QUANT16_SYMM ||
-                operandType == OperandType::TENSOR_QUANT16_ASYMM) {
-                input = DequantizeNode(input, operandIndex, ngraph::element::f32);
-            }
-        }
-
+        /*        if (dequantize) {
+                    if (operandType == OperandType::TENSOR_QUANT8_ASYMM ||
+                        operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL ||
+                        operandType == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
+                        operandType == OperandType::TENSOR_QUANT8_SYMM ||
+                        operandType == OperandType::TENSOR_QUANT16_SYMM ||
+                        operandType == OperandType::TENSOR_QUANT16_ASYMM) {
+                        input = DequantizeNode(input, operandIndex, ngraph::element::f32);
+                    }
+                }
+        */
         return input;
     }
     // remove null input node parameter
@@ -158,6 +158,8 @@ protected:
         return vec;
     }
 
+    std::shared_ptr<ngraph::Node> addFakeQuantizeNode(std::shared_ptr<ngraph::Node> inputNode,
+                                                      uint32_t index, uint32_t levels);
     std::shared_ptr<ngraph::Node> QuantizeNode(std::shared_ptr<ngraph::Node> input, size_t index,
                                                ngraph::element::Type quantizeType);
     std::shared_ptr<ngraph::Node> DequantizeNode(std::shared_ptr<ngraph::Node> input,
@@ -188,6 +190,7 @@ public:
     static std::shared_ptr<NnapiModelInfo> sModelInfo;
     static IntelDeviceType sPluginType;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
+    bool transposed = false;
     OperationsBase(int operationIndex);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
     virtual bool validate();
