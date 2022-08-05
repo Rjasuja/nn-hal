@@ -22,6 +22,7 @@
 #include "BasePreparedModel.h"
 #include "CpuPreparedModel.h"
 #include "GnaPreparedModel.h"
+#include "VpuPreparedModel.h"
 #include "ModelManager.h"
 #include "ValidateHal.h"
 
@@ -82,6 +83,8 @@ static sp<BasePreparedModel> ModelFactory(IntelDeviceType deviceType, const Mode
         driverPreparedModel = new CpuPreparedModel(model);
     else if (deviceType == IntelDeviceType::GNA)
         driverPreparedModel = new GnaPreparedModel(model);
+    else if (deviceType == IntelDeviceType::VPU)
+        driverPreparedModel = new VpuPreparedModel(model);
     return driverPreparedModel;
 }
 // For HAL-1.0 version

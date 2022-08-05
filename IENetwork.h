@@ -14,52 +14,48 @@
 // #include "ie_core.hpp"
 // #include "inference_engine.hpp"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
-class IIENetwork {
-public:
-    virtual ~IIENetwork() {}
-    virtual bool loadNetwork() = 0;
-    virtual InferenceEngine::InferRequest getInferRequest() = 0;
-    virtual void infer() = 0;
-    virtual void queryState() = 0;
-    virtual InferenceEngine::TBlob<float>::Ptr getBlob(const std::string& outName) = 0;
-    virtual void prepareInput(InferenceEngine::Precision precision,
-                              InferenceEngine::Layout layout) = 0;
-    virtual void prepareOutput(InferenceEngine::Precision precision,
-                               InferenceEngine::Layout layout) = 0;
-    virtual void setBlob(const std::string& inName,
-                         const InferenceEngine::Blob::Ptr& inputBlob) = 0;
-};
+    class IIENetwork {
+    public:
+        virtual ~IIENetwork() {}
+        virtual bool loadNetwork() = 0;
+        virtual InferenceEngine::InferRequest getInferRequest() = 0;
+        virtual void infer() = 0;
+        virtual void queryState() = 0;
+        virtual InferenceEngine::TBlob<float>::Ptr getBlob(const std::string& outName) = 0;
+        virtual void prepareInput(InferenceEngine::Precision precision,
+                                InferenceEngine::Layout layout) = 0;
+        virtual void prepareOutput(InferenceEngine::Precision precision,
+                                InferenceEngine::Layout layout) = 0;
+        virtual void setBlob(const std::string& inName,
+                            const InferenceEngine::Blob::Ptr& inputBlob) = 0;
+    };
 
-// Abstract this class for all accelerators
-class IENetwork : public IIENetwork {
-private:
-    std::shared_ptr<InferenceEngine::CNNNetwork> mNetwork;
-    InferenceEngine::ExecutableNetwork mExecutableNw;
-    InferenceEngine::InferRequest mInferRequest;
-    InferenceEngine::InputsDataMap mInputInfo;
-    InferenceEngine::OutputsDataMap mOutputInfo;
+    // Abstract this class for all accelerators
+    class IENetwork : public IIENetwork {
+    private:
+        std::shared_ptr<InferenceEngine::CNNNetwork> mNetwork;
+        InferenceEngine::ExecutableNetwork mExecutableNw;
+        InferenceEngine::InferRequest mInferRequest;
+        InferenceEngine::InputsDataMap mInputInfo;
+        InferenceEngine::OutputsDataMap mOutputInfo;
+        IntelDeviceType mTargetDevice;
 
-public:
-    IENetwork() : IENetwork(nullptr) {}
-    IENetwork(std::shared_ptr<InferenceEngine::CNNNetwork> network) : mNetwork(network) {}
+    public:
+        IENetwork() {}
+        IENetwork(IntelDeviceType device) : mTargetDevice(device) {}
+        IENetwork(std::shared_ptr<InferenceEngine::CNNNetwork> network) : mNetwork(network) {}
 
-    virtual bool loadNetwork();
-    void prepareInput(InferenceEngine::Precision precision, InferenceEngine::Layout layout);
-    void prepareOutput(InferenceEngine::Precision precision, InferenceEngine::Layout layout);
-    void setBlob(const std::string& inName, const InferenceEngine::Blob::Ptr& inputBlob);
-    InferenceEngine::TBlob<float>::Ptr getBlob(const std::string& outName);
-    InferenceEngine::InferRequest getInferRequest() { return mInferRequest; }
-    void queryState() {}
-    void infer();
-};
+        virtual bool loadNetwork();
+        void prepareInput(InferenceEngine::Precision precision, InferenceEngine::Layout layout);
+        void prepareOutput(InferenceEngine::Precision precision, InferenceEngine::Layout layout);
+        void setBlob(const std::string& inName, const InferenceEngine::Blob::Ptr& inputBlob);
+        InferenceEngine::TBlob<float>::Ptr getBlob(const std::string& outName);
+        InferenceEngine::InferRequest getInferRequest() { return mInferRequest; }
+        void queryState() {}
+        void infer();
+    };
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal
 #endif

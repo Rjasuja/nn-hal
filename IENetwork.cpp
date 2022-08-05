@@ -21,9 +21,22 @@ bool IENetwork::loadNetwork() {
     InferenceEngine::Core ie(std::string("/usr/local/lib64/plugins.xml"));
 #endif
     std::map<std::string, std::string> config;
+    std::string deviceStr;
+    switch(mTargetDevice) {
+        case IntelDeviceType::GNA:
+            deviceStr = "GNA";
+            break;
+        case IntelDeviceType::VPU:
+            deviceStr = "VPUX";
+            break;
+        case IntelDeviceType::CPU:
+        default:
+            deviceStr = "CPU";
+            break;
+    }
 
     if (mNetwork) {
-        mExecutableNw = ie.LoadNetwork(*mNetwork, "CPU");
+        mExecutableNw = ie.LoadNetwork(*mNetwork, deviceStr);
         ALOGD("LoadNetwork is done....");
         mInferRequest = mExecutableNw.CreateInferRequest();
         ALOGD("CreateInfereRequest is done....");
