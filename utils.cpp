@@ -34,10 +34,7 @@
 
 using namespace InferenceEngine;
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 
@@ -463,6 +460,3 @@ void writeBufferToFile(std::string filename, const float* buf, size_t length) {
 }
 
 }  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android

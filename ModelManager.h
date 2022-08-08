@@ -8,13 +8,9 @@
 #include "Driver.h"
 #include "utils.h"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 using ::android::hidl::memory::V1_0::IMemory;
-
 using Blob = InferenceEngine::Blob;
 
 // Utility class that provides functions and methods around NNAPI Model
@@ -205,8 +201,5 @@ private:
 };
 
 }  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
 
 #endif

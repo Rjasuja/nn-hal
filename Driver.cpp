@@ -16,9 +16,9 @@
 
 #include "Driver.h"
 #include <string>
-
-#include <android-base/logging.h>
 #include <thread>
+#include <android-base/logging.h>
+#include <LegacyHalUtils.h>
 #include "BasePreparedModel.h"
 #include "CpuPreparedModel.h"
 #include "GnaPreparedModel.h"
@@ -28,10 +28,7 @@
 
 #define LOG_TAG "Driver"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 using namespace android::nn;
 
@@ -481,6 +478,3 @@ Return<void> Driver::getSupportedExtensions(getSupportedExtensions_cb cb) {
 }
 
 }  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android

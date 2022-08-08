@@ -1,11 +1,7 @@
 #include "ModelManager.h"
 
 #define LOG_TAG "ModelManager"
-
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>& outputDims,
                                         bool isLengthSufficient) {
@@ -509,7 +505,7 @@ V1_3::ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
 
 ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
     const hidl_vec<hidl_memory>& pools) {
-    ALOGD("Number of pools: %d", pools.size());
+    ALOGD("Number of pools: %zu", pools.size());
 
     mRequestPoolInfos.resize(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
@@ -595,6 +591,3 @@ template uint8_t NnapiModelInfo::GetConstFromBuffer<uint8_t>(unsigned char const
 template int8_t NnapiModelInfo::GetConstFromBuffer<int8_t>(unsigned char const*, unsigned int);
 template uint32_t NnapiModelInfo::GetConstFromBuffer<uint32_t>(unsigned char const*, unsigned int);
 }  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android

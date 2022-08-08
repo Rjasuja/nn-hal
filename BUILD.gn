@@ -43,6 +43,7 @@ config("target_defaults") {
         "${sysroot}/usr/include/aosp/frameworks/ml/nn/common/include",
         "${sysroot}/usr/include/aosp/frameworks/ml/nn/runtime/include",
         "${sysroot}/usr/include/aosp/frameworks/ml/nn/driver/cache",
+        "${sysroot}/usr/include/aosp/frameworks/ml/nn/common/types/include",
     ]
 }
 

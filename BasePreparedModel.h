@@ -43,10 +43,7 @@ using ::android::hardware::MQDescriptorSync;
 using ::android::hidl::memory::V1_0::IMemory;
 using namespace InferenceEngine;
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 template <class T>
 using vec = std::vector<T>;
@@ -124,8 +121,5 @@ private:
 };
 
 }  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
 
 #endif  // ANDROID_ML_NN_PREPAREDMODEL_H

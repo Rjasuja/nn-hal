@@ -7,10 +7,7 @@
 #include <ie_blob.h>
 #include <log/log.h>
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 bool IENetwork::loadNetwork() {
     ALOGD("%s", __func__);
@@ -104,6 +101,3 @@ void IENetwork::infer() {
 }
 
 }  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
