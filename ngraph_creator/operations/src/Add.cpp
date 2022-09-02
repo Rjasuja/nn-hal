@@ -51,17 +51,7 @@ std::shared_ptr<ngraph::Node> Add::createNode() {
 }
 
 std::shared_ptr<ngraph::Node> Add::createNodeForPlugin() {
-    if (sPluginType == IntelDeviceType::VPU) {
-        auto input = mNgraphNodes->getOperationOutput(
-            sModelInfo->getOperationInput(mNnapiOperationIndex, 0));
-        std::shared_ptr<ngraph::Node> constantOp =
-            std::make_shared<ngraph::opset3::Constant>(ngraph::element::f32, input.get_shape());
-        auto transposedOp = transpose(NHWC_NCHW, constantOp);
-        return std::make_shared<ngraph::opset3::Add>(input, transposedOp,
-                                                     ngraph::op::AutoBroadcastType::NUMPY);
-    } else {
-        return createNode();
-    }
+    return createNode();
 }
 
 }  // namespace nnhal

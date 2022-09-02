@@ -1,4 +1,3 @@
-#define LOG_TAG "VpuPreparedModel"
 
 #include "VpuPreparedModel.h"
 #include <android-base/logging.h>
@@ -10,6 +9,8 @@
 #include "ValidateHal.h"
 #include "utils.h"
 
+#undef LOG_TAG
+#define LOG_TAG "VpuPreparedModel"
 using namespace android::nn;
 
 namespace android {
@@ -46,7 +47,7 @@ bool VpuPreparedModel::initialize(const Model& model) {
 #else
     ngraph_net->serialize("/tmp/ngraph_ir.xml", "/tmp/ngraph_ir.bin");
 #endif
-    mPlugin = std::make_shared<IENetwork>(ngraph_net);
+    mPlugin = std::make_shared<IENetwork>(mTargetDevice, ngraph_net);
     mPlugin->loadNetwork();
 
     ALOGV("Exiting %s", __func__);

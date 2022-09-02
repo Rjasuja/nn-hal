@@ -31,7 +31,7 @@ namespace android::hardware::neuralnetworks::nnhal {
 
 class VpuPreparedModel : public BasePreparedModel {
 public:
-    VpuPreparedModel(const Model& model) : BasePreparedModel(IntelDeviceType::GNA, model) {}
+    VpuPreparedModel(const Model& model) : BasePreparedModel(IntelDeviceType::VPU, model) {}
     ~VpuPreparedModel() { deinitialize(); }
 
     bool initialize(const Model& model) override;

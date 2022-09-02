@@ -32,6 +32,8 @@ bool IENetwork::loadNetwork() {
             break;
     }
 
+    ALOGD("Creating infer request for Intel Device Type : %s", deviceStr.c_str());
+
     if (mNetwork) {
         mExecutableNw = ie.LoadNetwork(*mNetwork, deviceStr);
         ALOGD("LoadNetwork is done....");

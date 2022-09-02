@@ -35,17 +35,15 @@ namespace android::hardware::neuralnetworks::nnhal {
     // Abstract this class for all accelerators
     class IENetwork : public IIENetwork {
     private:
+        IntelDeviceType mTargetDevice;
         std::shared_ptr<InferenceEngine::CNNNetwork> mNetwork;
         InferenceEngine::ExecutableNetwork mExecutableNw;
         InferenceEngine::InferRequest mInferRequest;
         InferenceEngine::InputsDataMap mInputInfo;
         InferenceEngine::OutputsDataMap mOutputInfo;
-        IntelDeviceType mTargetDevice;
 
     public:
-        IENetwork() {}
-        IENetwork(IntelDeviceType device) : mTargetDevice(device) {}
-        IENetwork(std::shared_ptr<InferenceEngine::CNNNetwork> network) : mNetwork(network) {}
+	IENetwork(IntelDeviceType device, std::shared_ptr<InferenceEngine::CNNNetwork> network) : mTargetDevice(device), mNetwork(network) {}
 
         virtual bool loadNetwork();
         void prepareInput(InferenceEngine::Precision precision, InferenceEngine::Layout layout);
